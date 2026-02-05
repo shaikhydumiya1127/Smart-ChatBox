@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aura AI | Smart Chatbox</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&display=swap');
+
+        :root {
+            --accent: #c084fc;
+            --neural-blue: #3b82f6;
+            --bg-dark: #020205;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: #f1f5f9;
+            font-family: 'Space Grotesk', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #silk-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            opacity: 0.5;
+        }
+
+        .glass-overlay {
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(circle at center, transparent 0%, rgba(2, 2, 5, 0.6) 100%);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .smart-workspace {
+            position: relative;
+            z-index: 10;
+            width: 95%;
+            max-width: 1100px;
+            height: 90vh;
+            display: flex;
+            flex-direction: column;
+            background: rgba(10, 10, 20, 0.4);
+            backdrop-filter: blur(30px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 48px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+        }
+
+        .workspace-header {
+            padding: 1.5rem 2.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        }
+
+        .chat-bubble-ai {
+            background: linear-gradient(135deg, rgba(192, 132, 252, 0.1), rgba(59, 130, 246, 0.05));
+            border-left: 3px solid var(--accent);
+            border-radius: 4px 32px 32px 32px;
+            animation: liquid-reveal 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+
+        .chat-bubble-user {
+            background: rgba(255, 255, 255, 0.05);
+            border-right: 3px solid var(--neural-blue);
+            border-radius: 32px 32px 4px 32px;
+            animation: slide-in-right 0.5s ease;
+        }
+
+        .smart-dock {
+            margin: 0 2rem 2rem 2rem;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 40px;
+            transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+            position: relative;
+        }
+
+        .smart-dock:focus-within {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(192, 132, 252, 0.4);
+            transform: translateY(-5px);
+        }
+
+        #image-preview-container {
+            display: none;
+            padding: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 5px;
+        }
+
+        .preview-img {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 12px;
+            border: 2px solid var(--accent);
+        }
+
+        @keyframes liquid-reveal {
+            0% { clip-path: polygon(0 0, 0 0, 0 100%, 0% 100%); opacity: 0; transform: translateY(10px); }
+            100% { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes slide-in-right {
+            0% { opacity: 0; transform: translateX(20px); }
+            100% { opacity: 1; transform: translateX(0); }
+        }
+
+        .thinking-dots span {
+            animation: dot-pulse 1.5s infinite;
+            display: inline-block;
+            margin: 0 2px;
+        }
+        .thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes dot-pulse {
+            0%, 100% { transform: scale(1); opacity: 0.3; }
+            50% { transform: scale(1.5); opacity: 1; }
+        }
+
+        .mic-active {
+            color: #ef4444 !important;
+            animation: pulse-red 1s infinite;
+        }
+
+        @keyframes pulse-red {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body>
+
+    <canvas id="silk-canvas"></canvas>
+    <div class="glass-overlay"></div>
+
+    <div class="smart-workspace">
+        <header class="workspace-header">
+            <div class="flex items-center gap-4">
+                <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 to-blue-600 flex items-center justify-center shadow-lg shadow-purple-500/20">
+                    <i class="fas fa-brain text-white text-sm"></i>
+                </div>
+                <div>
+                    <h2 class="text-sm font-bold tracking-[0.2em] uppercase text-white">Cognitive Nexus</h2>
+                    <div class="flex items-center gap-2">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span class="text-[9px] font-bold uppercase tracking-widest text-emerald-500/80">Active Neural Link</span>
+                    </div>
+                </div>
+            </div>
+            <div class="text-[10px] text-white/40 uppercase tracking-widest">
+                v2.5 Neural Active
+            </div>
+        </header>
+
+        <div id="chat-container" class="flex-1 overflow-y-auto px-8 md:px-16 py-8 space-y-8">
+            <div class="flex justify-start">
+                <div class="flex items-start gap-5 max-w-[85%]">
+                    <div class="w-10 h-10 rounded-full border border-purple-500/20 flex items-center justify-center bg-purple-500/5 shrink-0">
+                        <i class="fas fa-sparkles text-purple-400 text-xs"></i>
+                    </div>
+                    <div class="p-6 chat-bubble-ai text-slate-200 text-lg leading-relaxed shadow-xl">
+                       “Hi! 👋 I’m here to help—just tell me what you’re looking for.”.<br><br>
+                        I'm ready to analyze your images, transcribe your voice, or discuss any video content you share. What shall we explore today?
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="w-full">
+            <div class="max-w-4xl mx-auto px-8">
+                <div class="smart-dock flex flex-col transition-all overflow-hidden mb-8">
+                    <!-- Image Preview Area -->
+                    <div id="image-preview-container" class="flex items-center gap-4">
+                        <img id="preview-img" class="preview-img" src="" alt="preview">
+                        <button onclick="clearImage()" class="text-xs text-red-400 uppercase font-bold tracking-widest hover:text-red-300">Remove Image</button>
+                    </div>
+
+                    <div class="p-3 flex items-end gap-3">
+                        <input type="file" id="file-input" accept="image/*" class="hidden">
+                        <button id="upload-btn" class="w-12 h-12 rounded-full hover:bg-white/5 text-slate-500 flex items-center justify-center transition-colors" title="Upload Image">
+                            <i class="fas fa-image"></i>
+                        </button>
+                        
+                        <textarea id="user-input" rows="1" placeholder="Type message or paste YouTube link..." 
+                            class="flex-1 bg-transparent border-none focus:ring-0 text-slate-100 py-3 resize-none outline-none text-lg placeholder:text-slate-600"></textarea>
+                        
+                        <div class="flex items-center gap-2">
+                            <button id="mic-btn" class="w-12 h-12 rounded-full hover:bg-white/5 text-slate-500 flex items-center justify-center transition-all" title="Voice Input">
+                                <i class="fas fa-microphone"></i>
+                            </button>
+                            <button id="send-btn" class="w-12 h-12 rounded-full bg-purple-600 text-white hover:bg-purple-500 hover:scale-110 active:scale-95 transition-all shadow-lg shadow-purple-600/30 flex items-center justify-center">
+                                <i class="fas fa-arrow-up"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- BACKGROUND EFFECTS ---
+        const AuraSilk = {
+            canvas: document.getElementById('silk-canvas'),
+            ctx: null, w: 0, h: 0, particles: []
+        };
+        class Particle {
+            constructor() { this.reset(); }
+            reset() {
+                this.x = Math.random() * AuraSilk.w;
+                this.y = Math.random() * AuraSilk.h;
+                this.vx = (Math.random() - 0.5) * 0.3;
+                this.vy = (Math.random() - 0.5) * 0.3;
+                this.life = Math.random() * 200;
+                this.hue = Math.random() > 0.6 ? 270 : 200;
+            }
+            update() {
+                this.x += this.vx; this.y += this.vy; this.life -= 0.05;
+                if (this.life <= 0 || this.x < 0 || this.x > AuraSilk.w || this.y < 0 || this.y > AuraSilk.h) this.reset();
+            }
+            draw() {
+                const ctx = AuraSilk.ctx;
+                ctx.beginPath();
+                const g = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, 180);
+                g.addColorStop(0, `hsla(${this.hue}, 80%, 60%, 0.04)`);
+                g.addColorStop(1, 'transparent');
+                ctx.fillStyle = g; ctx.arc(this.x, this.y, 180, 0, Math.PI * 2); ctx.fill();
+            }
+        }
+        function initCanvas() {
+            AuraSilk.ctx = AuraSilk.canvas.getContext('2d');
+            AuraSilk.w = AuraSilk.canvas.width = window.innerWidth;
+            AuraSilk.h = AuraSilk.canvas.height = window.innerHeight;
+            AuraSilk.particles = Array.from({length: 35}, () => new Particle());
+        }
+        function animate() {
+            AuraSilk.ctx.clearRect(0, 0, AuraSilk.w, AuraSilk.h);
+            AuraSilk.particles.forEach(p => { p.update(); p.draw(); });
+            requestAnimationFrame(animate);
+        }
+        window.addEventListener('resize', initCanvas);
+        initCanvas(); animate();
+
+        // --- CHAT LOGIC ---
+        const API_KEY = "AIzaSyDkeSbqrd_4pmIZkxeN-YieodRFsdUi2Vw"; 
+        const TEXT_MODEL = "gemini-2.5-flash-preview-09-2025";
+        
+        const chatContainer = document.getElementById('chat-container');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const micBtn = document.getElementById('mic-btn');
+        const fileInput = document.getElementById('file-input');
+        const uploadBtn = document.getElementById('upload-btn');
+        const imagePreviewArea = document.getElementById('image-preview-container');
+        const previewImg = document.getElementById('preview-img');
+
+        let selectedImageBase64 = null;
+        let isRecording = false;
+
+        // --- IMAGE HANDLING ---
+        uploadBtn.onclick = () => fileInput.click();
+        fileInput.onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    selectedImageBase64 = ev.target.result.split(',')[1];
+                    previewImg.src = ev.target.result;
+                    imagePreviewArea.style.display = 'flex';
+                };
+                reader.readAsDataURL(file);
+            }
+        };
+        function clearImage() {
+            selectedImageBase64 = null;
+            imagePreviewArea.style.display = 'none';
+            fileInput.value = '';
+        }
+
+        // --- MICROPHONE / VOICE HANDLING ---
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            const recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.onstart = () => { isRecording = true; micBtn.classList.add('mic-active'); };
+            recognition.onend = () => { isRecording = false; micBtn.classList.remove('mic-active'); };
+            recognition.onresult = (event) => {
+                userInput.value = event.results[0][0].transcript;
+                sendMessage();
+            };
+            micBtn.onclick = () => {
+                if (isRecording) recognition.stop();
+                else recognition.start();
+            };
+        } else {
+            micBtn.style.opacity = "0.3";
+        }
+
+        // --- UI HELPERS ---
+        function parseVideos(text) {
+            const ytRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com|youtu\.be)\/(?:watch\?v=)?(.+)/g;
+            return text.replace(ytRegex, (match, id) => {
+                const cleanId = id.split('&')[0].split('?')[0];
+                return `<div class="mt-4 rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
+                    <iframe width="100%" height="315" src="https://www.youtube.com/embed/${cleanId}" frameborder="0" allowfullscreen></iframe>
+                </div>`;
+            });
+        }
+
+        function appendMessage(role, content, imageBase64 = null) {
+            const wrapper = document.createElement('div');
+            wrapper.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
+            const isAI = role === 'model';
+            
+            let processedContent = content.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
+            processedContent = parseVideos(processedContent);
+
+            let imageHtml = imageBase64 ? `<img src="data:image/png;base64,${imageBase64}" class="w-64 rounded-xl mb-4 border border-white/10 shadow-lg block">` : '';
+
+            wrapper.innerHTML = `
+                <div class="flex items-start gap-5 max-w-[85%] ${role === 'user' ? 'flex-row-reverse' : ''}">
+                    <div class="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+                        <i class="fas ${isAI ? 'fa-robot text-purple-400' : 'fa-user text-blue-400'} text-xs"></i>
+                    </div>
+                    <div class="p-6 ${isAI ? 'chat-bubble-ai' : 'chat-bubble-user'} text-slate-200 text-lg leading-relaxed shadow-xl">
+                        ${imageHtml}
+                        ${processedContent}
+                    </div>
+                </div>
+            `;
+            chatContainer.appendChild(wrapper);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function showThinking() {
+            const id = 'th-' + Date.now();
+            const wrapper = document.createElement('div');
+            wrapper.id = id;
+            wrapper.className = "flex justify-start";
+            wrapper.innerHTML = `
+                <div class="flex items-start gap-5">
+                    <div class="w-10 h-10 rounded-full bg-white/5 border border-purple-500/20 flex items-center justify-center shrink-0">
+                        <i class="fas fa-atom text-purple-400 animate-spin"></i>
+                    </div>
+                    <div class="p-4 px-6 rounded-2xl bg-white/5 border border-white/5 text-purple-400 text-xs font-bold uppercase tracking-[0.3em]">
+                        Syncing Pulse<span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span>
+                    </div>
+                </div>
+            `;
+            chatContainer.appendChild(wrapper);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            return id;
+        }
+
+        // --- CORE SEND LOGIC ---
+        async function sendMessage() {
+            const text = userInput.value.trim();
+            const img = selectedImageBase64;
+            if (!text && !img) return;
+
+            appendMessage('user', text || "[Image Shared]", img);
+            userInput.value = '';
+            userInput.style.height = 'auto';
+            clearImage();
+            
+            const tid = showThinking();
+            try {
+                const payload = {
+                    contents: [{
+                        parts: [{ text: text || "What is in this image?" }]
+                    }],
+                    systemInstruction: { 
+                        parts: [{ text: "You are Aura, an advanced AI. Be helpful, concise but detailed when needed, and friendly. If a user shares a YouTube video, discuss its potential content. If they share an image, describe it vividly." }] 
+                    }
+                };
+
+                if (img) {
+                    payload.contents[0].parts.push({
+                        inlineData: { mimeType: "image/png", data: img }
+                    });
+                }
+
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${TEXT_MODEL}:generateContent?key=${API_KEY}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const data = await response.json();
+                if (data.error) throw new Error(data.error.message);
+
+                const thinkingEl = document.getElementById(tid);
+                if (thinkingEl) thinkingEl.remove();
+                appendMessage('model', data.candidates?.[0]?.content?.parts?.[0]?.text || "No response received.");
+            } catch (e) {
+                const thinkingEl = document.getElementById(tid);
+                if (thinkingEl) thinkingEl.remove();
+                appendMessage('model', `<b>Neural Error:</b> ${e.message}`);
+            }
+        }
+
+        sendBtn.onclick = sendMessage;
+        userInput.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } };
+        userInput.oninput = function() { this.style.height = 'auto'; this.style.height = Math.min(this.scrollHeight, 200) + 'px'; };
+    </script>
+</body>
+</html>
